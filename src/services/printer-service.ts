@@ -36,7 +36,6 @@ export class PrinterService {
       const printer = await printersApi.getById(printerId);
       if (!printer || !printer.plasticId) return false;
       
-      // Нельзя удалить пластик если принтер печатает
       if (printer.status === PrinterStatus.PRINTING) return false;
       
       const plasticId = printer.plasticId;
