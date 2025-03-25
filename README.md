@@ -1,39 +1,46 @@
-# 3d-printer-app
+# Приложение управления 3D-принтерами
 
-This template should help get you started developing with Vue 3 in Vite.
+## О проекте
 
-## Recommended IDE Setup
+Это одностраничное приложение (SPA) для управления 3D-принтерами, разработанное с использованием Vue.js и TypeScript. Приложение позволяет управлять 3D-принтерами, пластиками и моделями для печати.
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## Выполненные задачи
 
-## Type Support for `.vue` Imports in TS
+- Создана архитектура приложения с разделением ответственности
+- Реализована маршрутизация на 4 страницы
+- Создана "шапка" и "подвал" сайта
+- Реализовано взаимодействие с JSON Server для хранения данных
+- Реализованы необходимые проверки:
+  - Проверка наличия пластика перед печатью
+  - Симуляция ошибок печати с разными типами
+  - Валидация пользовательского ввода
+- Созданы 4 страницы с полной функциональностью:
+  - Главная страница с управлением печатью
+  - Страница принтеров
+  - Страница пластиков
+  - Страница моделей
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+## Используемые технологии
 
-## Customize configuration
+- Vue.js 3
+- TypeScript
+- Vue Router
+- Composition API
+- JSON Server
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+## Запуск проекта
 
-## Project Setup
-
-```sh
+1. Установите зависимости:
+```bash
 npm install
 ```
 
-### Compile and Hot-Reload for Development
-
-```sh
+2. Запустите сервер и проект в разных терминалах:
+```bash
 npm run dev
 ```
-
-### Type-Check, Compile and Minify for Production
-
-```sh
-npm run build
+```bash
+npm run json-server
 ```
 
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-npm run lint
-```
+3. Откройте браузер и перейдите по адресу: http://localhost:5173/
