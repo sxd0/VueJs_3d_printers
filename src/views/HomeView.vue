@@ -15,6 +15,7 @@ const refreshInterval = ref<number | null>(null);
 
 const fetchData = async () => {
   try {
+    console.log('Обновление данных...');
     const [printersData, plasticsData, modelsData] = await Promise.all([
       printersApi.getAll(),
       plasticsApi.getAll(),
@@ -27,17 +28,23 @@ const fetchData = async () => {
     
     error.value = '';
   } catch (err) {
+    console.error('Ошибка при загрузке данных:', err);
     error.value = 'Не удалось загрузить данные. Проверьте подключение к серверу.';
-    console.error(err);
   } finally {
     loading.value = false;
   }
 };
 
 const setupRefreshInterval = () => {
+  // Очищаем предыдущий интервал, если он был
+  if (refreshInterval.value) {
+    clearInterval(refreshInterval.value);
+  }
+  
+  // Более частое обновление для лучшей реактивности
   refreshInterval.value = window.setInterval(() => {
     fetchData();
-  }, 5000); // Обновление данных каждые 5 секунд
+  }, 1000); // Обновление данных каждую секунду
 };
 
 onMounted(() => {
@@ -51,6 +58,12 @@ onBeforeUnmount(() => {
     clearInterval(refreshInterval.value);
   }
 });
+
+// Обработчик обновления данных от компонентов
+const handleUpdateData = () => {
+  console.log('Запрос на обновление данных от компонента');
+  fetchData();
+};
 </script>
 
 <template>
@@ -76,7 +89,7 @@ onBeforeUnmount(() => {
           :printer="printer"
           :plastics="plastics"
           :models="models"
-          @update-data="fetchData"
+          @update-data="handleUpdateData"
         />
       </div>
       

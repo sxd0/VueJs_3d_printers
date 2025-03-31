@@ -1,5 +1,44 @@
 {
-  "printers": [],
-  "plastics": [],
-  "models": []
+  "printers": [
+    {
+      "id": "e438",
+      "brand": "BOSH",
+      "articleNumber": "111",
+      "printSpeed": 60,
+      "status": "idle",
+      "plasticId": "5a06",
+      "currentModelId": "f6b4",
+      "printingProgress": 0,
+      "errorMessage": "Возникла ошибка: Перегрев принтера"
+    }
+  ],
+  "plastics": [
+    {
+      "id": "5a06",
+      "material": "ABS",
+      "color": "Black",
+      "length": 9,
+      "isInstalled": false,
+      "printerId": "e438"
+    }
+  ],
+  "models": [
+    {
+      "id": "44ee",
+      "name": "Figure",
+      "perimeterLength": 1,
+      "creationDate": "2025-03-31T16:28:23.051Z",
+      "status": "completed",
+      "printerId": "e438",
+      "plasticColor": "Black"
+    },
+    {
+      "id": "f6b4",
+      "name": "1",
+      "perimeterLength": 1,
+      "creationDate": "2025-03-31T16:29:51.290Z",
+      "status": "created",
+      "printerId": "e438"
+    }
+  ]
 }

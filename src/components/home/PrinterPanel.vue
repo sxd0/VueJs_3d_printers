@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue';
 import type { Printer, Plastic, Model, PrinterError } from '@/types';
 import { PrinterStatus, ModelStatus, PrinterErrorType } from '@/types';
 import { PrinterService } from '@/services/printer-service';
@@ -21,6 +21,38 @@ const isPrinting = ref(false);
 const printProgress = ref(0);
 const printingInterval = ref<number | null>(null);
 const errorMessage = ref('');
+
+// Очистка интервала печати при размонтировании компонента
+onBeforeUnmount(() => {
+  if (printingInterval.value) {
+    clearInterval(printingInterval.value);
+    printingInterval.value = null;
+  }
+});
+
+// Следим за изменениями принтера и обновляем локальное состояние
+watch(() => props.printer, (newPrinter) => {
+  if (newPrinter.status === PrinterStatus.PRINTING && !isPrinting.value) {
+    isPrinting.value = true;
+    printProgress.value = newPrinter.printingProgress || 0;
+    startPrinting();
+  } else if (newPrinter.status !== PrinterStatus.PRINTING && isPrinting.value) {
+    isPrinting.value = false;
+    if (printingInterval.value) {
+      clearInterval(printingInterval.value);
+      printingInterval.value = null;
+    }
+  }
+}, { immediate: true });
+
+// При монтировании компонента проверяем, если принтер печатает, запускаем процесс
+onMounted(() => {
+  if (props.printer.status === PrinterStatus.PRINTING) {
+    isPrinting.value = true;
+    printProgress.value = props.printer.printingProgress || 0;
+    startPrinting();
+  }
+});
 
 const installedPlastic = computed(() => {
   if (!props.printer.plasticId) return null;
@@ -48,29 +80,70 @@ const printerModels = computed(() => {
   );
 });
 
+// Исправленный метод установки пластика
 const installPlastic = async () => {
   if (!selectedPlasticId.value) return;
   
-  const result = await PrinterService.installPlastic(
-    props.printer.id, 
-    selectedPlasticId.value
-  );
+  errorMessage.value = '';
+  console.log('Установка пластика:', selectedPlasticId.value);
   
-  if (result) {
-    selectedPlasticId.value = null;
-    emit('updateData');
-  } else {
-    errorMessage.value = 'Не удалось установить пластик в принтер';
+  try {
+    // Используем метод сервиса для установки пластика
+    const result = await PrinterService.installPlastic(
+      props.printer.id, 
+      selectedPlasticId.value
+    );
+    
+    if (result) {
+      console.log('Пластик успешно установлен');
+      selectedPlasticId.value = null;
+      emit('updateData'); // Запрашиваем обновление данных
+    } else {
+      errorMessage.value = 'Не удалось установить пластик в принтер';
+    }
+  } catch (err) {
+    console.error('Ошибка при установке пластика:', err);
+    errorMessage.value = 'Ошибка при установке пластика';
   }
 };
 
+// Исправленный метод извлечения пластика
 const removePlastic = async () => {
-  const result = await PrinterService.removePlastic(props.printer.id);
+  errorMessage.value = '';
   
-  if (result) {
-    emit('updateData');
-  } else {
-    errorMessage.value = 'Не удалось извлечь пластик из принтера';
+  if (!props.printer.plasticId) {
+    console.log('Невозможно извлечь пластик: пластик не установлен');
+    return;
+  }
+  
+  if (props.printer.status === PrinterStatus.PRINTING) {
+    errorMessage.value = 'Нельзя извлечь пластик во время печати';
+    console.log('Нельзя извлечь пластик во время печати');
+    return;
+  }
+  
+  console.log('Извлечение пластика из принтера', props.printer.id);
+  
+  try {
+    // Напрямую обновляем данные через API, не используя сервис
+    const plasticId = props.printer.plasticId;
+    
+    // Обновить принтер: убрать пластик
+    await printersApi.update(props.printer.id, {
+      plasticId: undefined
+    });
+    
+    // Обновить пластик: отметить как не установленный
+    await plasticsApi.update(plasticId, {
+      isInstalled: false,
+      printerId: undefined
+    });
+    
+    console.log('Пластик успешно извлечен');
+    emit('updateData'); // Запрашиваем обновление данных
+  } catch (err) {
+    console.error('Ошибка при извлечении пластика:', err);
+    errorMessage.value = 'Не удалось извлечь пластик';
   }
 };
 
@@ -79,121 +152,230 @@ const addModelToPrint = async () => {
   
   errorMessage.value = '';
   
+  // Проверяем, хватит ли пластика
   const model = props.models.find(m => m.id === selectedModelId.value);
   const plastic = installedPlastic.value;
   
-  if (!model || !plastic) return;
+  if (!model || !plastic) {
+    errorMessage.value = 'Модель или пластик не найдены';
+    return;
+  }
   
   if (plastic.length < model.perimeterLength) {
     errorMessage.value = 'Недостаточно пластика для печати этой модели';
     return;
   }
   
-  const result = await PrinterService.addModelToPrinter(
-    props.printer.id,
-    selectedModelId.value
-  );
-  
-  if (result) {
-    selectedModelId.value = null;
-    emit('updateData');
-
-    if (props.printer.status !== PrinterStatus.PRINTING) {
-      startPrinting();
+  try {
+    console.log('Добавление модели в очередь печати:', model.name);
+    
+    // Метод PrinterService для добавления модели в очередь
+    const result = await PrinterService.addModelToPrinter(
+      props.printer.id,
+      selectedModelId.value
+    );
+    
+    if (result) {
+      selectedModelId.value = null;
+      emit('updateData');
+      
+      // Если принтер не печатает, запустим печать
+      if (props.printer.status !== PrinterStatus.PRINTING) {
+        startPrinting();
+      }
+    } else {
+      errorMessage.value = 'Не удалось добавить модель в очередь на печать';
     }
-  } else {
-    errorMessage.value = 'Не удалось добавить модель в очередь на печать';
+  } catch (err) {
+    console.error('Ошибка при добавлении модели:', err);
+    errorMessage.value = 'Ошибка при добавлении модели';
   }
 };
 
+// Исправленная функция печати
 const startPrinting = async () => {
-  if (isPrinting.value || !printingModel.value || !installedPlastic.value) return;
+  if (!printingModel.value || !installedPlastic.value) {
+    console.log('Невозможно начать печать: нет модели или пластика');
+    return;
+  }
+  
+  // Если интервал уже запущен, останавливаем его
+  if (printingInterval.value) {
+    clearInterval(printingInterval.value);
+    printingInterval.value = null;
+  }
+  
+  console.log('Начало печати модели:', printingModel.value.name);
   
   isPrinting.value = true;
-  printProgress.value = 0;
   
-  await printersApi.update(props.printer.id, {
-    status: PrinterStatus.PRINTING,
-    printingProgress: 0
-  });
+  // Обновляем статус принтера, если он не в процессе печати
+  if (props.printer.status !== PrinterStatus.PRINTING) {
+    await printersApi.update(props.printer.id, {
+      status: PrinterStatus.PRINTING,
+      printingProgress: printProgress.value
+    });
+    emit('updateData');
+  }
   
+  // Запускаем интервал для симуляции процесса печати
   printingInterval.value = window.setInterval(async () => {
+    console.log('Прогресс печати:', printProgress.value + 5);
+    
+    // Увеличиваем прогресс
     printProgress.value += 5;
     
+    // Проверяем на возможные ошибки в процессе печати
     const error = PrinterService.generateRandomError(printingModel.value!.id);
     
     if (error) {
+      console.log('Возникла ошибка печати:', error.type);
+      // Остановка печати из-за ошибки
       await handlePrintError(error);
       return;
     }
     
+    // Обновляем прогресс в базе данных
     await printersApi.update(props.printer.id, {
       printingProgress: printProgress.value
     });
     
+    // Если печать завершена
     if (printProgress.value >= 100) {
+      console.log('Печать завершена успешно');
       await completePrinting();
     }
   }, 1000);
 };
 
-const handlePrintError = async (error: PrinterError) => {
-  clearInterval(printingInterval.value!);
-  printingInterval.value = null;
+// Функция остановки печати
+const stopPrinting = async () => {
+  console.log('Остановка печати');
+  
+  if (printingInterval.value) {
+    clearInterval(printingInterval.value);
+    printingInterval.value = null;
+  }
+  
   isPrinting.value = false;
   
-  await printersApi.update(props.printer.id, {
-    status: PrinterStatus.ERROR,
-    errorMessage: error.message
-  });
-  
-  errorMessage.value = `Ошибка печати: ${error.type}`;
-  
-  emit('updateData');
+  try {
+    // Обновляем статус принтера
+    await printersApi.update(props.printer.id, {
+      status: PrinterStatus.IDLE,
+      printingProgress: 0
+    });
+    
+    // Возвращаем модель в список созданных
+    if (printingModel.value) {
+      await modelsApi.update(printingModel.value.id, {
+        status: ModelStatus.CREATED,
+        printerId: undefined
+      });
+    }
+    
+    console.log('Печать успешно остановлена');
+    emit('updateData');
+  } catch (err) {
+    console.error('Ошибка при остановке печати:', err);
+    errorMessage.value = 'Не удалось остановить печать';
+  }
 };
 
+// Обработка ошибок печати
+const handlePrintError = async (error: PrinterError) => {
+  console.log('Обработка ошибки печати:', error);
+  
+  if (printingInterval.value) {
+    clearInterval(printingInterval.value);
+    printingInterval.value = null;
+  }
+  
+  isPrinting.value = false;
+  
+  try {
+    // Отмечаем принтер как имеющий ошибку
+    await printersApi.update(props.printer.id, {
+      status: PrinterStatus.ERROR,
+      errorMessage: error.message
+    });
+    
+    // Устанавливаем сообщение об ошибке
+    errorMessage.value = `Ошибка печати: ${error.type}`;
+    
+    console.log('Статус принтера изменен на ERROR');
+    emit('updateData');
+  } catch (err) {
+    console.error('Ошибка при обработке ошибки печати:', err);
+  }
+};
+
+// Завершение печати
 const completePrinting = async () => {
-  clearInterval(printingInterval.value!);
-  printingInterval.value = null;
+  console.log('Завершение печати');
+  
+  if (printingInterval.value) {
+    clearInterval(printingInterval.value);
+    printingInterval.value = null;
+  }
+  
   isPrinting.value = false;
   
   const plastic = installedPlastic.value;
   const model = printingModel.value;
   
-  if (!plastic || !model) return;
-  
-  const newLength = Math.max(0, plastic.length - model.perimeterLength);
-  await plasticsApi.update(plastic.id, {
-    length: newLength
-  });
-  
-  await modelsApi.update(model.id, {
-    status: ModelStatus.COMPLETED,
-    plasticColor: plastic.color
-  });
-  
-  const nextModel = printerModels.value[0];
-  
-  if (nextModel) {
-    await printersApi.update(props.printer.id, {
-      currentModelId: nextModel.id,
-      printingProgress: 0
-    });
-    
-    printProgress.value = 0;
-    setTimeout(startPrinting, 1000);
-  } else {
-    await printersApi.update(props.printer.id, {
-      status: PrinterStatus.IDLE,
-      currentModelId: undefined,
-      printingProgress: undefined
-    });
+  if (!plastic || !model) {
+    console.log('Невозможно завершить печать: нет пластика или модели');
+    return;
   }
   
-  emit('updateData');
+  try {
+    // Обновляем длину пластика
+    const newLength = Math.max(0, plastic.length - model.perimeterLength);
+    await plasticsApi.update(plastic.id, {
+      length: newLength
+    });
+    
+    // Обновляем статус модели
+    await modelsApi.update(model.id, {
+      status: ModelStatus.COMPLETED,
+      plasticColor: plastic.color
+    });
+    
+    // Проверяем следующую модель в очереди
+    const nextModel = printerModels.value[0];
+    
+    if (nextModel) {
+      // Устанавливаем следующую модель как текущую для печати
+      await printersApi.update(props.printer.id, {
+        currentModelId: nextModel.id,
+        printingProgress: 0
+      });
+      
+      // Запускаем печать следующей модели
+      printProgress.value = 0;
+      setTimeout(startPrinting, 1000);
+    } else {
+      // Нет моделей в очереди, принтер свободен
+      await printersApi.update(props.printer.id, {
+        status: PrinterStatus.IDLE,
+        currentModelId: undefined,
+        printingProgress: undefined
+      });
+    }
+    
+    console.log('Печать успешно завершена');
+    emit('updateData');
+  } catch (err) {
+    console.error('Ошибка при завершении печати:', err);
+    errorMessage.value = 'Ошибка при завершении печати';
+  }
 };
 
+// Улучшенный метод сброса ошибки
 const resetPrinter = async () => {
+  console.log('Сброс ошибки принтера');
+  
   if (printingInterval.value) {
     clearInterval(printingInterval.value);
     printingInterval.value = null;
@@ -203,12 +385,31 @@ const resetPrinter = async () => {
   printProgress.value = 0;
   errorMessage.value = '';
   
-  await printersApi.update(props.printer.id, {
-    status: PrinterStatus.IDLE,
-    errorMessage: undefined
-  });
-  
-  emit('updateData');
+  try {
+    const currentModelId = props.printer.currentModelId;
+    
+    // Обновляем статус принтера на IDLE
+    await printersApi.update(props.printer.id, {
+      status: PrinterStatus.IDLE,
+      errorMessage: undefined,
+      printingProgress: 0,
+      currentModelId: undefined
+    });
+    
+    // Если была модель в процессе печати, возвращаем ее в список доступных
+    if (currentModelId) {
+      await modelsApi.update(currentModelId, {
+        status: ModelStatus.CREATED,
+        printerId: undefined
+      });
+    }
+    
+    console.log('Ошибка принтера успешно сброшена');
+    emit('updateData');
+  } catch (err) {
+    console.error('Ошибка при сбросе ошибки принтера:', err);
+    errorMessage.value = 'Не удалось сбросить ошибку принтера';
+  }
 };
 </script>
 
@@ -238,6 +439,7 @@ const resetPrinter = async () => {
               <div>Осталось: {{ installedPlastic.length.toFixed(1) }} м</div>
             </div>
           </div>
+          <!-- Разрешаем извлекать пластик, если принтер не печатает -->
           <button @click="removePlastic" :disabled="printer.status === PrinterStatus.PRINTING">
             Извлечь
           </button>
@@ -269,6 +471,11 @@ const resetPrinter = async () => {
             <div class="progress-fill" :style="{ width: `${printer.printingProgress || 0}%` }"></div>
             <div class="progress-label">{{ printer.printingProgress || 0 }}%</div>
           </div>
+          
+          <!-- Кнопка остановки печати -->
+          <button @click="stopPrinting" class="stop-btn" v-if="printer.status === PrinterStatus.PRINTING">
+            Остановить печать
+          </button>
         </div>
         
         <div class="model-queue" v-if="printerModels.length > 0">
@@ -280,14 +487,14 @@ const resetPrinter = async () => {
           </ul>
         </div>
         
-        <div v-if="installedPlastic && printer.status !== PrinterStatus.ERROR" class="model-selector">
+        <div v-if="installedPlastic && printer.status !== PrinterStatus.ERROR && printer.status !== PrinterStatus.PRINTING" class="model-selector">
           <select v-model="selectedModelId">
             <option :value="null" disabled>Выберите модель для печати</option>
             <option v-for="model in printableModels" :key="model.id" :value="model.id">
               {{ model.name }} ({{ model.perimeterLength.toFixed(1) }} м)
             </option>
           </select>
-          <button @click="addModelToPrint" :disabled="!selectedModelId || !installedPlastic">
+          <button @click="addModelToPrint" :disabled="!selectedModelId">
             Добавить в очередь
           </button>
         </div>
@@ -465,6 +672,7 @@ button:disabled {
   border-radius: 0.5rem;
   overflow: hidden;
   position: relative;
+  margin-bottom: 0.5rem;
 }
 
 .progress-fill {
@@ -486,6 +694,16 @@ button:disabled {
   font-size: 0.75rem;
   font-weight: bold;
   text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+.stop-btn {
+  background-color: #ef4444;
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
+.stop-btn:hover {
+  background-color: #dc2626;
 }
 
 .model-queue {
