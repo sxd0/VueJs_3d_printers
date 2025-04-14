@@ -3,7 +3,7 @@
 
 <template>
   <footer class="app-footer">
-    <p>ФИО Студента, Группа-000</p>
+    <p>Жетписов, Группа: 231-323</p>
   </footer>
 </template>
 

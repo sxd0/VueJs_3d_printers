@@ -36,15 +36,13 @@ const fetchData = async () => {
 };
 
 const setupRefreshInterval = () => {
-  // Очищаем предыдущий интервал, если он был
   if (refreshInterval.value) {
     clearInterval(refreshInterval.value);
   }
   
-  // Более частое обновление для лучшей реактивности
   refreshInterval.value = window.setInterval(() => {
     fetchData();
-  }, 1000); // Обновление данных каждую секунду
+  }, 1000);
 };
 
 onMounted(() => {
@@ -59,7 +57,6 @@ onBeforeUnmount(() => {
   }
 });
 
-// Обработчик обновления данных от компонентов
 const handleUpdateData = () => {
   console.log('Запрос на обновление данных от компонента');
   fetchData();

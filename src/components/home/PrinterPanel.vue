@@ -22,7 +22,6 @@ const printProgress = ref(0);
 const printingInterval = ref<number | null>(null);
 const errorMessage = ref('');
 
-// Очистка интервала печати при размонтировании компонента
 onBeforeUnmount(() => {
   if (printingInterval.value) {
     clearInterval(printingInterval.value);
@@ -30,7 +29,6 @@ onBeforeUnmount(() => {
   }
 });
 
-// Следим за изменениями принтера и обновляем локальное состояние
 watch(() => props.printer, (newPrinter) => {
   if (newPrinter.status === PrinterStatus.PRINTING && !isPrinting.value) {
     isPrinting.value = true;
@@ -45,7 +43,6 @@ watch(() => props.printer, (newPrinter) => {
   }
 }, { immediate: true });
 
-// При монтировании компонента проверяем, если принтер печатает, запускаем процесс
 onMounted(() => {
   if (props.printer.status === PrinterStatus.PRINTING) {
     isPrinting.value = true;
@@ -80,7 +77,6 @@ const printerModels = computed(() => {
   );
 });
 
-// Исправленный метод установки пластика
 const installPlastic = async () => {
   if (!selectedPlasticId.value) return;
   
@@ -88,7 +84,6 @@ const installPlastic = async () => {
   console.log('Установка пластика:', selectedPlasticId.value);
   
   try {
-    // Используем метод сервиса для установки пластика
     const result = await PrinterService.installPlastic(
       props.printer.id, 
       selectedPlasticId.value
@@ -97,7 +92,7 @@ const installPlastic = async () => {
     if (result) {
       console.log('Пластик успешно установлен');
       selectedPlasticId.value = null;
-      emit('updateData'); // Запрашиваем обновление данных
+      emit('updateData');
     } else {
       errorMessage.value = 'Не удалось установить пластик в принтер';
     }
@@ -107,7 +102,7 @@ const installPlastic = async () => {
   }
 };
 
-// Исправленный метод извлечения пластика
+
 const removePlastic = async () => {
   errorMessage.value = '';
   
@@ -125,22 +120,19 @@ const removePlastic = async () => {
   console.log('Извлечение пластика из принтера', props.printer.id);
   
   try {
-    // Напрямую обновляем данные через API, не используя сервис
     const plasticId = props.printer.plasticId;
     
-    // Обновить принтер: убрать пластик
     await printersApi.update(props.printer.id, {
       plasticId: undefined
     });
     
-    // Обновить пластик: отметить как не установленный
     await plasticsApi.update(plasticId, {
       isInstalled: false,
       printerId: undefined
     });
     
     console.log('Пластик успешно извлечен');
-    emit('updateData'); // Запрашиваем обновление данных
+    emit('updateData'); 
   } catch (err) {
     console.error('Ошибка при извлечении пластика:', err);
     errorMessage.value = 'Не удалось извлечь пластик';
@@ -152,7 +144,6 @@ const addModelToPrint = async () => {
   
   errorMessage.value = '';
   
-  // Проверяем, хватит ли пластика
   const model = props.models.find(m => m.id === selectedModelId.value);
   const plastic = installedPlastic.value;
   
@@ -169,7 +160,6 @@ const addModelToPrint = async () => {
   try {
     console.log('Добавление модели в очередь печати:', model.name);
     
-    // Метод PrinterService для добавления модели в очередь
     const result = await PrinterService.addModelToPrinter(
       props.printer.id,
       selectedModelId.value
@@ -179,7 +169,6 @@ const addModelToPrint = async () => {
       selectedModelId.value = null;
       emit('updateData');
       
-      // Если принтер не печатает, запустим печать
       if (props.printer.status !== PrinterStatus.PRINTING) {
         startPrinting();
       }
@@ -192,14 +181,12 @@ const addModelToPrint = async () => {
   }
 };
 
-// Исправленная функция печати
 const startPrinting = async () => {
   if (!printingModel.value || !installedPlastic.value) {
     console.log('Невозможно начать печать: нет модели или пластика');
     return;
   }
   
-  // Если интервал уже запущен, останавливаем его
   if (printingInterval.value) {
     clearInterval(printingInterval.value);
     printingInterval.value = null;
@@ -209,7 +196,6 @@ const startPrinting = async () => {
   
   isPrinting.value = true;
   
-  // Обновляем статус принтера, если он не в процессе печати
   if (props.printer.status !== PrinterStatus.PRINTING) {
     await printersApi.update(props.printer.id, {
       status: PrinterStatus.PRINTING,
@@ -218,29 +204,22 @@ const startPrinting = async () => {
     emit('updateData');
   }
   
-  // Запускаем интервал для симуляции процесса печати
   printingInterval.value = window.setInterval(async () => {
     console.log('Прогресс печати:', printProgress.value + 5);
     
-    // Увеличиваем прогресс
     printProgress.value += 5;
     
-    // Проверяем на возможные ошибки в процессе печати
     const error = PrinterService.generateRandomError(printingModel.value!.id);
     
     if (error) {
       console.log('Возникла ошибка печати:', error.type);
-      // Остановка печати из-за ошибки
       await handlePrintError(error);
       return;
     }
     
-    // Обновляем прогресс в базе данных
     await printersApi.update(props.printer.id, {
       printingProgress: printProgress.value
     });
-    
-    // Если печать завершена
     if (printProgress.value >= 100) {
       console.log('Печать завершена успешно');
       await completePrinting();
@@ -248,7 +227,6 @@ const startPrinting = async () => {
   }, 1000);
 };
 
-// Функция остановки печати
 const stopPrinting = async () => {
   console.log('Остановка печати');
   
@@ -260,13 +238,11 @@ const stopPrinting = async () => {
   isPrinting.value = false;
   
   try {
-    // Обновляем статус принтера
     await printersApi.update(props.printer.id, {
       status: PrinterStatus.IDLE,
       printingProgress: 0
     });
     
-    // Возвращаем модель в список созданных
     if (printingModel.value) {
       await modelsApi.update(printingModel.value.id, {
         status: ModelStatus.CREATED,
@@ -282,7 +258,6 @@ const stopPrinting = async () => {
   }
 };
 
-// Обработка ошибок печати
 const handlePrintError = async (error: PrinterError) => {
   console.log('Обработка ошибки печати:', error);
   
@@ -294,13 +269,11 @@ const handlePrintError = async (error: PrinterError) => {
   isPrinting.value = false;
   
   try {
-    // Отмечаем принтер как имеющий ошибку
     await printersApi.update(props.printer.id, {
       status: PrinterStatus.ERROR,
       errorMessage: error.message
     });
     
-    // Устанавливаем сообщение об ошибке
     errorMessage.value = `Ошибка печати: ${error.type}`;
     
     console.log('Статус принтера изменен на ERROR');
@@ -310,7 +283,6 @@ const handlePrintError = async (error: PrinterError) => {
   }
 };
 
-// Завершение печати
 const completePrinting = async () => {
   console.log('Завершение печати');
   
@@ -330,33 +302,27 @@ const completePrinting = async () => {
   }
   
   try {
-    // Обновляем длину пластика
     const newLength = Math.max(0, plastic.length - model.perimeterLength);
     await plasticsApi.update(plastic.id, {
       length: newLength
     });
     
-    // Обновляем статус модели
     await modelsApi.update(model.id, {
       status: ModelStatus.COMPLETED,
       plasticColor: plastic.color
     });
     
-    // Проверяем следующую модель в очереди
     const nextModel = printerModels.value[0];
     
     if (nextModel) {
-      // Устанавливаем следующую модель как текущую для печати
       await printersApi.update(props.printer.id, {
         currentModelId: nextModel.id,
         printingProgress: 0
       });
       
-      // Запускаем печать следующей модели
       printProgress.value = 0;
       setTimeout(startPrinting, 1000);
     } else {
-      // Нет моделей в очереди, принтер свободен
       await printersApi.update(props.printer.id, {
         status: PrinterStatus.IDLE,
         currentModelId: undefined,
@@ -372,7 +338,6 @@ const completePrinting = async () => {
   }
 };
 
-// Улучшенный метод сброса ошибки
 const resetPrinter = async () => {
   console.log('Сброс ошибки принтера');
   
@@ -388,7 +353,6 @@ const resetPrinter = async () => {
   try {
     const currentModelId = props.printer.currentModelId;
     
-    // Обновляем статус принтера на IDLE
     await printersApi.update(props.printer.id, {
       status: PrinterStatus.IDLE,
       errorMessage: undefined,
@@ -396,7 +360,6 @@ const resetPrinter = async () => {
       currentModelId: undefined
     });
     
-    // Если была модель в процессе печати, возвращаем ее в список доступных
     if (currentModelId) {
       await modelsApi.update(currentModelId, {
         status: ModelStatus.CREATED,
@@ -419,7 +382,7 @@ const resetPrinter = async () => {
       <h3>{{ printer.brand }} ({{ printer.articleNumber }})</h3>
       <div :class="['status-badge', `status-${printer.status.toLowerCase()}`]">
         {{ printer.status === PrinterStatus.IDLE ? 'Готов к работе' : 
-           printer.status === PrinterStatus.PRINTING ? 'Печатает' : 'Ошибка' }}
+          printer.status === PrinterStatus.PRINTING ? 'Печатает' : 'Ошибка' }}
       </div>
     </div>
     
@@ -439,7 +402,6 @@ const resetPrinter = async () => {
               <div>Осталось: {{ installedPlastic.length.toFixed(1) }} м</div>
             </div>
           </div>
-          <!-- Разрешаем извлекать пластик, если принтер не печатает -->
           <button @click="removePlastic" :disabled="printer.status === PrinterStatus.PRINTING">
             Извлечь
           </button>
@@ -472,7 +434,6 @@ const resetPrinter = async () => {
             <div class="progress-label">{{ printer.printingProgress || 0 }}%</div>
           </div>
           
-          <!-- Кнопка остановки печати -->
           <button @click="stopPrinting" class="stop-btn" v-if="printer.status === PrinterStatus.PRINTING">
             Остановить печать
           </button>
