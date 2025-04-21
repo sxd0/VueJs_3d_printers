@@ -7,7 +7,6 @@ import { modelsApi } from "../../src/services/api";
 import { ModelStatus } from "../../src/types";
 import { nextTick } from "vue";
 
-// Мокаем API
 vi.mock("../../src/services/api", () => ({
   modelsApi: {
     getAll: vi.fn(),
@@ -16,7 +15,6 @@ vi.mock("../../src/services/api", () => ({
   }
 }));
 
-// Мокаем компоненты
 vi.mock("../../src/components/models/ModelCard.vue", () => ({
   default: {
     name: "ModelCard",
@@ -36,12 +34,10 @@ vi.mock("../../src/components/models/ModelForm.vue", () => ({
 describe("ModelsView.vue", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    // Мокируем window.confirm
     window.confirm = vi.fn(() => true);
   });
   
   it("отображает списки моделей со статусами created, printing и completed", async () => {
-    // Arrange
     const models = [
       { id: 1, name: "Model 1", status: ModelStatus.CREATED, perimeterLength: 5, creationDate: "2023-01-01T00:00:00Z" },
       { id: 2, name: "Model 2", status: ModelStatus.PRINTING, perimeterLength: 5, creationDate: "2023-01-02T00:00:00Z" },
@@ -50,14 +46,11 @@ describe("ModelsView.vue", () => {
     
     modelsApi.getAll.mockResolvedValue(models);
     
-    // Act
     const wrapper = mount(ModelsView);
     
-    // Ждем завершения асинхронных операций
     await flushPromises();
     await nextTick();
     
-    // Assert
     expect(wrapper.findAll(".model-card").length).toBe(3);
     expect(wrapper.text()).toContain("Model 1");
     expect(wrapper.text()).toContain("Model 2");
@@ -65,7 +58,6 @@ describe("ModelsView.vue", () => {
   });
   
   it("сортирует модели по имени в порядке возрастания", async () => {
-    // Arrange
     const models = [
       { id: 1, name: "C Model", status: ModelStatus.CREATED, perimeterLength: 5, creationDate: "2023-01-01T00:00:00Z" },
       { id: 2, name: "A Model", status: ModelStatus.CREATED, perimeterLength: 5, creationDate: "2023-01-02T00:00:00Z" },
@@ -76,15 +68,12 @@ describe("ModelsView.vue", () => {
     
     const wrapper = mount(ModelsView);
     
-    // Ждем завершения асинхронных операций
     await flushPromises();
     await nextTick();
     
-    // Act
     wrapper.vm.toggleSort('name');
     await nextTick();
     
-    // Assert
     const sortedModels = wrapper.vm.createdModels;
     expect(sortedModels[0].name).toBe("A Model");
     expect(sortedModels[1].name).toBe("B Model");
@@ -92,7 +81,6 @@ describe("ModelsView.vue", () => {
   });
   
   it("удаляет модель при вызове события delete", async () => {
-    // Arrange
     const models = [
       { id: 1, name: "Model 1", status: ModelStatus.CREATED, perimeterLength: 5, creationDate: "2023-01-01T00:00:00Z" }
     ];
@@ -102,11 +90,9 @@ describe("ModelsView.vue", () => {
     
     const wrapper = mount(ModelsView);
     
-    // Ждем завершения асинхронных операций
     await flushPromises();
     await nextTick();
     
-    // Мокируем метод handleDeleteModel для прямого вызова
     const deleteMethod = vi.fn(async (id) => {
       await modelsApi.delete(id);
       wrapper.vm.models = wrapper.vm.models.filter(model => model.id !== id);
@@ -114,15 +100,12 @@ describe("ModelsView.vue", () => {
     
     wrapper.vm.handleDeleteModel = deleteMethod;
     
-    // Act
     await wrapper.vm.handleDeleteModel(1);
     
-    // Assert
     expect(modelsApi.delete).toHaveBeenCalledWith(1);
   });
   
   it("создает копию модели при вызове события copy", async () => {
-    // Arrange
     const models = [
       { id: 1, name: "Model 1", status: ModelStatus.CREATED, perimeterLength: 5, creationDate: "2023-01-01T00:00:00Z" }
     ];
@@ -139,11 +122,9 @@ describe("ModelsView.vue", () => {
     
     const wrapper = mount(ModelsView);
     
-    // Ждем завершения асинхронных операций
     await flushPromises();
     await nextTick();
     
-    // Мокируем метод handleCopyModel для прямого вызова
     const copyMethod = vi.fn(async (model) => {
       const copyData = {
         name: `${model.name} (копия)`,
@@ -158,10 +139,8 @@ describe("ModelsView.vue", () => {
     
     wrapper.vm.handleCopyModel = copyMethod;
     
-    // Act
     await wrapper.vm.handleCopyModel(models[0]);
     
-    // Assert
     expect(modelsApi.create).toHaveBeenCalledWith(expect.objectContaining({
       name: expect.stringContaining("(копия)"),
       perimeterLength: 5,

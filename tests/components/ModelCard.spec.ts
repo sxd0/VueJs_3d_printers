@@ -6,7 +6,6 @@ import { nextTick } from "vue";
 
 describe("ModelCard.vue", () => {
   it("корректно отображает детали модели", async () => {
-    // Arrange
     const model = {
       id: 1,
       name: "Test Model",
@@ -15,7 +14,6 @@ describe("ModelCard.vue", () => {
       status: ModelStatus.CREATED
     };
     
-    // Act
     const wrapper = mount(ModelCard, {
       props: {
         model
@@ -24,14 +22,12 @@ describe("ModelCard.vue", () => {
     
     await nextTick();
     
-    // Assert
     expect(wrapper.text()).toContain("Test Model");
     expect(wrapper.text()).toContain("10.5");
     expect(wrapper.text()).toContain("Создана");
   });
   
   it("вызывает событие delete при нажатии на кнопку удаления", async () => {
-    // Arrange
     const model = {
       id: 1,
       name: "Test Model",
@@ -46,16 +42,13 @@ describe("ModelCard.vue", () => {
       }
     });
     
-    // Act
     await wrapper.find(".delete-btn").trigger("click");
     
-    // Assert
     expect(wrapper.emitted()).toHaveProperty("delete");
     expect(wrapper.emitted().delete[0]).toEqual([1]);
   });
   
   it("отображает цвет пластика для готовых моделей", async () => {
-    // Arrange
     const model = {
       id: 1,
       name: "Test Model",
@@ -65,7 +58,6 @@ describe("ModelCard.vue", () => {
       plasticColor: "Red"
     };
     
-    // Act
     const wrapper = mount(ModelCard, {
       props: {
         model
@@ -74,13 +66,11 @@ describe("ModelCard.vue", () => {
     
     await nextTick();
     
-    // Assert
     expect(wrapper.text()).toContain("Red");
     expect(wrapper.find(".color-dot").exists()).toBe(true);
   });
   
   it("показывает кнопку копирования только для созданных моделей", async () => {
-    // Arrange
     const createdModel = {
       id: 1,
       name: "Created Model",
@@ -97,7 +87,6 @@ describe("ModelCard.vue", () => {
       status: ModelStatus.COMPLETED
     };
     
-    // Act
     const createdWrapper = mount(ModelCard, {
       props: {
         model: createdModel
@@ -112,7 +101,6 @@ describe("ModelCard.vue", () => {
     
     await nextTick();
     
-    // Assert
     expect(createdWrapper.find(".copy-btn").exists()).toBe(true);
     expect(completedWrapper.find(".copy-btn").exists()).toBe(false);
   });

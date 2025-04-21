@@ -3,7 +3,6 @@ import { PrinterService } from "../../src/services/printer-service";
 import { printersApi, plasticsApi, modelsApi } from "../../src/services/api";
 import { PrinterStatus, ModelStatus, PrinterErrorType } from "../../src/types";
 
-// Мокаем API сервисы
 vi.mock("../../src/services/api", () => {
   return {
     printersApi: {
@@ -28,7 +27,6 @@ describe("PrinterService", () => {
 
   describe("installPlastic", () => {
     it("должен успешно установить пластик в принтер", async () => {
-      // Arrange
       const printerId = 1;
       const plasticId = 2;
       
@@ -46,10 +44,8 @@ describe("PrinterService", () => {
       printersApi.update.mockResolvedValue({});
       plasticsApi.update.mockResolvedValue({});
       
-      // Act
       const result = await PrinterService.installPlastic(printerId, plasticId);
       
-      // Assert
       expect(result).toBe(true);
       expect(printersApi.update).toHaveBeenCalledWith(printerId, { 
         plasticId: plasticId,
@@ -62,7 +58,6 @@ describe("PrinterService", () => {
     });
     
     it("должен возвращать false, если принтер печатает", async () => {
-      // Arrange
       const printerId = 1;
       const plasticId = 2;
       
@@ -77,10 +72,8 @@ describe("PrinterService", () => {
         isInstalled: false
       });
       
-      // Act
       const result = await PrinterService.installPlastic(printerId, plasticId);
       
-      // Assert
       expect(result).toBe(false);
       expect(printersApi.update).not.toHaveBeenCalled();
       expect(plasticsApi.update).not.toHaveBeenCalled();
@@ -89,7 +82,6 @@ describe("PrinterService", () => {
 
   describe("removePlastic", () => {
     it("должен успешно извлекать пластик из принтера", async () => {
-      // Arrange
       const printerId = 1;
       const plasticId = 2;
       
@@ -102,10 +94,8 @@ describe("PrinterService", () => {
       printersApi.update.mockResolvedValue({});
       plasticsApi.update.mockResolvedValue({});
       
-      // Act
       const result = await PrinterService.removePlastic(printerId);
       
-      // Assert
       expect(result).toBe(true);
       expect(printersApi.update).toHaveBeenCalledWith(printerId, { 
         plasticId: undefined,
@@ -118,7 +108,6 @@ describe("PrinterService", () => {
     });
     
     it("должен возвращать false, если принтер печатает", async () => {
-      // Arrange
       const printerId = 1;
       
       printersApi.getById.mockResolvedValue({
@@ -127,17 +116,14 @@ describe("PrinterService", () => {
         plasticId: 2
       });
       
-      // Act
       const result = await PrinterService.removePlastic(printerId);
       
-      // Assert
       expect(result).toBe(false);
       expect(printersApi.update).not.toHaveBeenCalled();
       expect(plasticsApi.update).not.toHaveBeenCalled();
     });
     
     it("должен возвращать false, если пластик не установлен", async () => {
-      // Arrange
       const printerId = 1;
       
       printersApi.getById.mockResolvedValue({
@@ -146,10 +132,8 @@ describe("PrinterService", () => {
         plasticId: undefined
       });
       
-      // Act
       const result = await PrinterService.removePlastic(printerId);
       
-      // Assert
       expect(result).toBe(false);
       expect(printersApi.update).not.toHaveBeenCalled();
       expect(plasticsApi.update).not.toHaveBeenCalled();
@@ -158,7 +142,6 @@ describe("PrinterService", () => {
 
   describe("addModelToPrinter", () => {
     it("должен успешно добавлять модель в очередь принтера", async () => {
-      // Arrange
       const printerId = 1;
       const modelId = 2;
       const plasticId = 3;
@@ -183,10 +166,8 @@ describe("PrinterService", () => {
       modelsApi.update.mockResolvedValue({});
       printersApi.update.mockResolvedValue({});
       
-      // Act
       const result = await PrinterService.addModelToPrinter(printerId, modelId);
       
-      // Assert
       expect(result).toBe(true);
       expect(modelsApi.update).toHaveBeenCalledWith(modelId, {
         status: ModelStatus.PRINTING,
@@ -200,7 +181,6 @@ describe("PrinterService", () => {
     });
     
     it("должен возвращать false, если недостаточно пластика", async () => {
-      // Arrange
       const printerId = 1;
       const modelId = 2;
       const plasticId = 3;
@@ -222,17 +202,14 @@ describe("PrinterService", () => {
         length: 10
       });
       
-      // Act
       const result = await PrinterService.addModelToPrinter(printerId, modelId);
       
-      // Assert
       expect(result).toBe(false);
       expect(modelsApi.update).not.toHaveBeenCalled();
       expect(printersApi.update).not.toHaveBeenCalled();
     });
     
     it("должен возвращать false, если пластик не установлен", async () => {
-      // Arrange
       const printerId = 1;
       const modelId = 2;
       
@@ -248,10 +225,8 @@ describe("PrinterService", () => {
         status: ModelStatus.CREATED
       });
       
-      // Act
       const result = await PrinterService.addModelToPrinter(printerId, modelId);
       
-      // Assert
       expect(result).toBe(false);
       expect(modelsApi.update).not.toHaveBeenCalled();
       expect(printersApi.update).not.toHaveBeenCalled();
@@ -260,9 +235,8 @@ describe("PrinterService", () => {
 
   describe("generateRandomError", () => {
     it("должен возвращать ошибку с корректным типом и id модели", () => {
-      // Необходимо мокать Math.random для контроля вывода
       const originalRandom = Math.random;
-      Math.random = vi.fn().mockReturnValue(0.05); // Меньше 0.1, чтобы вызвать ошибку
+      Math.random = vi.fn().mockReturnValue(0.05);
       
       const modelId = 5;
       const error = PrinterService.generateRandomError(modelId);
@@ -271,21 +245,18 @@ describe("PrinterService", () => {
       expect(error?.modelId).toBe(modelId);
       expect(Object.values(PrinterErrorType)).toContain(error?.type);
       
-      // Восстанавливаем оригинальный Math.random
       Math.random = originalRandom;
     });
     
     it("должен возвращать null, когда случайное число выше порога", () => {
-      // Необходимо мокать Math.random для контроля вывода
       const originalRandom = Math.random;
-      Math.random = vi.fn().mockReturnValue(0.2); // Больше 0.1
+      Math.random = vi.fn().mockReturnValue(0.2); 
       
       const modelId = 5;
       const error = PrinterService.generateRandomError(modelId);
       
       expect(error).toBeNull();
       
-      // Восстанавливаем оригинальный Math.random
       Math.random = originalRandom;
     });
   });
